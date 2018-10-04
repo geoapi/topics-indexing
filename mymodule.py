@@ -96,7 +96,9 @@ def insert_As_into_Qs_MongoDB():
                  dump_As_to_mongoDB(i)
                 # send the object i of the question i['question_id'] to be stored into mongodb, question id to help find the question
 
-def get_all_records():
+
+# reads posts from questions collections and get useful information like title body etc. and index its content using elk
+def index_all_questions_records():
     import pymongo, json
     from bson import Binary, Code, json_util
     from bson.json_util import dumps
@@ -121,7 +123,10 @@ def get_all_records():
             "view_count": loaded_doc['view_count'],
             "owner":loaded_doc['owner']['user_id'],
             "question_id":loaded_doc['question_id'],
-            "score":loaded_doc['score']
+            "score":loaded_doc['score'],
+            "my_join_field": {
+                "name": "q",
+             }
             }
         except KeyError as error:
             print(error)
@@ -136,10 +141,10 @@ def get_all_records():
         #    element.pop('view_count', None)
         #    element.pop('__len__', None)
         #
-        elasticsearch(obj)
+        elasticsearch_questions_posts(obj)
     return
 
-def elasticsearch(doc):
+def elasticsearch_questions_posts(doc):
     from datetime import datetime
     from elasticsearch import Elasticsearch, helpers
     es = Elasticsearch()
@@ -151,9 +156,75 @@ def elasticsearch(doc):
     # get request to Elk
     res = es.get(index="qpost1", doc_type='so', id=doc['question_id'])
     print(res['_source'])
-    es.indices.refresh(index="question")
+    es.indices.refresh(index="qpost1")
     #docs = get_all_records()
     #helpers.bulk(es, docs, chunk_size=1000, request_timeout=200)
+    return
+
+def elasticsearch_answers_posts(doc):
+    from datetime import datetime
+    from elasticsearch import Elasticsearch, helpers
+    es = Elasticsearch()
+    print(doc)
+    # for each A or doc make an index post for example a test-index type as  post doc
+    res = es.index(index="apost1", doc_type='so', id=doc['answer_id'], body=json.dumps(doc), params={"routing": doc['question_id']})
+    print(res['result'])
+    # get request to Elk
+    res = es.get(index="apost1", doc_type='so', id=doc['answer_id'], params={"routing": doc['question_id']})
+    print(res['_source'])
+    es.indices.refresh(index="apost1")
+    #docs = get_all_records()
+    #helpers.bulk(es, docs, chunk_size=1000, request_timeout=200)
+    return
+
+
+def index_all_answers_records():
+    import pymongo, json
+    from bson import Binary, Code, json_util
+    from bson.json_util import dumps
+    import json
+
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    mydb = myclient["api"]
+    mycol = mydb["answers"]
+    #docs=[]
+    for loaded_doc in mycol.find():
+        #docs =[doc]
+        #doc = json.dumps(doc)
+        #print(loaded_doc)
+       # json.dumps(result, default=json_util.default)
+        #loaded_doc =  json.loads(json_util.dumps(doc))
+       # TODO make a question document as the mapping in the index please, and make sure you create the relation to the answer, then get useful answer content as well
+        #loaded_doc['title']
+        try:
+          obj = {
+            "answer_body":loaded_doc['body'],
+           # "answer_title":loaded_doc['title'],
+           # "tags":loaded_doc['tags'],
+            #"view_count": loaded_doc['view_count'],
+            "answer_owner":loaded_doc['owner']['user_id'],
+            "answer_id":loaded_doc['answer_id'],
+            "score":loaded_doc['score'],
+            "question_id":loaded_doc['question_id'],
+            "my_join_field": {
+                 "name": "a",
+                 "parent":loaded_doc['question_id']
+                 }
+          }
+        except KeyError as error:
+            print(error)
+        #print(obj)
+        # for element in loaded_doc:
+        #    element.pop('_id', None)
+        #    element.pop('answer_count', None)
+        #    element.pop('is_answered', None)
+        #    element.pop('last_activity_date', None)
+        #    element.pop('last_edit_date', None)
+        #    element.pop('owner', None)
+        #    element.pop('view_count', None)
+        #    element.pop('__len__', None)
+        #
+        elasticsearch_answers_posts(obj)
     return
 
 
@@ -163,10 +234,7 @@ def elasticsearch(doc):
 #get_qs('api',3) #first
 #insert_As_into_Qs_MongoDB() #second
 #delete_qs_and_as() #restart and reset DB
-get_all_records()
-   
-
-
-
-
-            
+#index all questions posts
+#index_all_questions_records()
+#index all answers posts, make sure each answer is linked to the question and the relation is properly set
+index_all_answers_records()
