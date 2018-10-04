@@ -96,11 +96,74 @@ def insert_As_into_Qs_MongoDB():
                  dump_As_to_mongoDB(i)
                 # send the object i of the question i['question_id'] to be stored into mongodb, question id to help find the question
 
+def get_all_records():
+    import pymongo, json
+    from bson import Binary, Code, json_util
+    from bson.json_util import dumps
+    import json
+
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    mydb = myclient["api"]
+    mycol = mydb["questions"]
+    #docs=[]
+    for doc in mycol.find():
+        #docs =[doc]
+        #doc = json.dumps(doc)
+       # json.dumps(result, default=json_util.default)
+        loaded_doc =  json.loads(json_util.dumps(doc))
+       # TODO make a question document as the mapping in the index please, and make sure you create the relation to the answer, then get useful answer content as well
+        #loaded_doc['title']
+        try:
+            obj = {
+            "body":loaded_doc['body'],
+            "title":loaded_doc['title'],
+            "tags":loaded_doc['tags'],
+            "view_count": loaded_doc['view_count'],
+            "owner":loaded_doc['owner']['user_id'],
+            "question_id":loaded_doc['question_id'],
+            "score":loaded_doc['score']
+            }
+        except KeyError as error:
+            print(error)
+        #print(obj)
+        # for element in loaded_doc:
+        #    element.pop('_id', None)
+        #    element.pop('answer_count', None)
+        #    element.pop('is_answered', None)
+        #    element.pop('last_activity_date', None)
+        #    element.pop('last_edit_date', None)
+        #    element.pop('owner', None)
+        #    element.pop('view_count', None)
+        #    element.pop('__len__', None)
+        #
+        elasticsearch(obj)
+    return
+
+def elasticsearch(doc):
+    from datetime import datetime
+    from elasticsearch import Elasticsearch, helpers
+    es = Elasticsearch()
+    #print(doc)
+    #get Qs from the DB
+    # for each Q or doc make an index post for example a test-index type as tweet post doc
+    res = es.index(index="qpost1", doc_type='so', id=doc['question_id'], body=doc)
+    print(res['result'])
+    # get request to Elk
+    res = es.get(index="qpost1", doc_type='so', id=doc['question_id'])
+    print(res['_source'])
+    es.indices.refresh(index="question")
+    #docs = get_all_records()
+    #helpers.bulk(es, docs, chunk_size=1000, request_timeout=200)
+    return
+
+
+
 # Here you can specify the number of pages where each page is 100 Questions
 #This is where the requests to store questions begins here only 300 questions
-#get_qs('api',3)
-insert_As_into_Qs_MongoDB()
-#delete_qs_and_as()
+#get_qs('api',3) #first
+#insert_As_into_Qs_MongoDB() #second
+#delete_qs_and_as() #restart and reset DB
+get_all_records()
    
 
 
