@@ -151,12 +151,12 @@ def elasticsearch_questions_posts(doc):
     #print(doc)
     #get Qs from the DB
     # for each Q or doc make an index post for example a test-index type as tweet post doc
-    res = es.index(index="qpost1", doc_type='so', id=doc['question_id'], body=doc)
+    res = es.index(index="question", doc_type='so', id=doc['question_id'], body=doc)
     print(res['result'])
     # get request to Elk
-    res = es.get(index="qpost1", doc_type='so', id=doc['question_id'])
+    res = es.get(index="question", doc_type='so', id=doc['question_id'])
     print(res['_source'])
-    es.indices.refresh(index="qpost1")
+    es.indices.refresh(index="question")
     #docs = get_all_records()
     #helpers.bulk(es, docs, chunk_size=1000, request_timeout=200)
     return
@@ -167,12 +167,12 @@ def elasticsearch_answers_posts(doc):
     es = Elasticsearch()
     print(doc)
     # for each A or doc make an index post for example a test-index type as  post doc
-    res = es.index(index="apost1", doc_type='so', id=doc['answer_id'], body=json.dumps(doc), params={"routing": doc['question_id']})
+    res = es.index(index="answer", doc_type='so', id=doc['answer_id'], body=json.dumps(doc), params={"routing": doc['question_id']})
     print(res['result'])
     # get request to Elk
-    res = es.get(index="apost1", doc_type='so', id=doc['answer_id'], params={"routing": doc['question_id']})
+    res = es.get(index="answer", doc_type='so', id=doc['answer_id'], params={"routing": doc['question_id']})
     print(res['_source'])
-    es.indices.refresh(index="apost1")
+    es.indices.refresh(index="answer")
     #docs = get_all_records()
     #helpers.bulk(es, docs, chunk_size=1000, request_timeout=200)
     return
@@ -232,9 +232,10 @@ def index_all_answers_records():
 # Here you can specify the number of pages where each page is 100 Questions
 #This is where the requests to store questions begins here only 300 questions
 #get_qs('api',3) #first
-#insert_As_into_Qs_MongoDB() #second
+#insert_As_into_Qs_MongoDB() #second or store As seperately
 #delete_qs_and_as() #restart and reset DB
 #index all questions posts
 #index_all_questions_records()
 #index all answers posts, make sure each answer is linked to the question and the relation is properly set
 index_all_answers_records()
+# if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
