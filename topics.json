@@ -1,0 +1,30 @@
+{
+  "topics": [
+    {"id":0,"name":"security","category_id":0,"parent":true, "keywords":["security","safty", "api security"]},
+    {"id":1,"name":"oauth configuration","category_id":0,"parent":false,"keywords":["oauth","authentication","configuration","settings"]},
+    {"id":2,"name":"oauth clarification","category_id":0,"parent":false,"keywords":["oauth","understanding","clarification"]},
+    {"id":3,"name":"api constraints","category_id":1,"parent":true,"keywords":["restrictions"]},
+    {"id":4,"name":"possibility of a functionality","category_id":1,"parent":false,"keywords":["possible","feasible","functionality"]},
+    {"id":5,"name":"understanding usage limitation","category_id":1,"parent":false,"keywords":["limited","restricted","understanding"]},
+    {"id":6,"name":"debugging","category_id":2,"parent":true,"keywords":["debug","fix","error","log"]},
+    {"id":7,"name":"request","category_id":2,"parent":false,"keywords":["request","call","invocation"]},
+    {"id":8,"name":"behaviour","category_id":2,"parent":false,"keywords":["behaviour","act"]},
+    {"id":9,"name":"parameters","category_id":2,"parent":false,"keywords":["param","parameter"]},
+    {"id":10,"name":"returned data","category_id":2,"parent":false,"keywords":["returned","requested","data"]},
+    {"id":11,"name":"settings","category_id":3,"parent":true,"keywords":["settings","configuration"]},
+    {"id":12,"name":"usage","category_id":4,"parent":true,"keywords":["usage","use"]},
+    {"id":13,"name":"features implementation feasibility","category_id":4,"parent":false,"keywords":["feature","feasible","possible"]},
+    {"id":14,"name":"understanding functionality","category_id":4,"parent":false,"keywords":["function","understanding"]},
+    {"id":15,"name":"seeking alternative implementation","category_id":4,"parent":false,"keywords":["alternative","way","another"]},
+    {"id":16,"name":"development environment","category_id":4,"parent":false,"keywords":["environment","development"]},
+    {"id":17,"name":"examples","category_id":4,"parent":false,"keywords":["example","code"]},
+    {"id":18,"name":"documentation","category_id":5,"parent":true,"keywords":["documentation","reference"]},
+    {"id":19,"name":"redirection","category_id":5,"parent":false,"keywords":["redirect"]},
+    {"id":20,"name":"reporting issues","category_id":5,"parent":false,"keywords":["documentation","typo","mistake","error"]},
+    {"id":21,"name":"definition","category_id":6,"parent":true,"keywords":["definition"]},
+    {"id":22,"name":"design patterns","category_id":6,"parent":false,"keywords":["design","pattern"]},
+    {"id":23,"name":"version management","category_id":6,"parent":false,"keywords":["version"]},
+    {"id":24,"name":"setting parameters","category_id":6,"parent":false,"keywords":["setting","configuration","parameter"]},
+    {"id":25,"name":"recommendation","category_id":6,"parent":false,"keywords":["recommend","suggest"]}
+  ]
+}
