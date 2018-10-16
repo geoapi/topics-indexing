@@ -9,23 +9,35 @@ class JSONEncoder(json.JSONEncoder):
 
 #JSONEncoder().encode(analytics) #here analytics is a variable of type dict which will which will be turned into string
 # #make request to get questions based on tag and for one page at time
-def get_qs(tag,page):
+def get_qs(tag,page,i):
     import requests
     import json
-    i = 1
+    import time, threading
+    from timeit import default_timer as timer
+    s = timer()
+    #i = 1 initilize at the start so that a timing thread call can be used to the last page number after the quota if finished.
+
     url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100&key=keqVr01zTBktmTggfO2lMg(("
+#    url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100"
     url = url + '&tagged=' + tag + "&page=" + str(i)
     res = requests.get(url)
     list1 = res.json()
     dump_Qs_to_mongoDB(list1)
     i += 1
     while (i <= page and list1['has_more'] and list1['quota_remaining'] > 0):
+#        url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100"
+        #TODO Get the key stored into a seperate text file and load it here instead
         url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100&key=keqVr01zTBktmTggfO2lMg(("
         url = url + '&tagged=' + tag + "&page=" + str(i)
         res = requests.get(url)
         list1 = res.json()
         dump_Qs_to_mongoDB(list1)
         i += 1
+        if (list1['has_more'] and list1['quota_remaining']==0):
+          print('Quota issue, process will resume in 1 day!')
+          threading.Timer(86400, get_qs(tag,i)).start()
+    e = timer()
+    print (e - s)
     return
 
 
@@ -34,11 +46,10 @@ def get_answers(str1):
       import requests
       import json
       url1 = "https://api.stackexchange.com/2.2/questions/"
-      url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key=keqVr01zTBktmTggfO2lMg(("
-
+      #url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key=keqVr01zTBktmTggfO2lMg(("
+      url2 = "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody"
       url = url1 + str(str1) + url2
       headers ={"Accept":"application/json", "User-Agent": "RandomHeader"}
-
       res = requests.get(url,headers)
       return res.json()
 
@@ -49,7 +60,9 @@ def dump_Qs_to_mongoDB(data):
     mydb = myclient["api"]
     mycol = mydb["questions"]
     list1 = data['items']
-    x = mycol.insert_many(list1)
+    for item in list1:
+        mycol.update(item,item,upsert=True) # To make sure the document is updated not duplicated
+    #x = mycol.insert_many(list1)
     return
 
 
@@ -60,7 +73,8 @@ def dump_As_to_mongoDB(data):
       myclient = pymongo.MongoClient("mongodb://localhost:27017/")
       mydb = myclient["api"]
       mycol = mydb["answers"]
-      x = mycol.insert_one(data)
+      #x = mycol.insert_one(data)
+      mycol.update(data, data, upsert=True)
       return
 
     # def update_Q_add_AcceptedAnswer(id,ans_obj):
@@ -220,9 +234,10 @@ def index_all_answers_records():
     #index all answers posts, make sure each answer is linked to the question and the relation is properly set
     #index_all_answers_records()
     # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
-get_qs('box-api',1) #first
+get_qs('api',1000,1) #first call get questions assuming there are thousand posts starting from the first page
 insert_As_into_Qs_MongoDB() #second or store As seperately
 #Elasticsearch basic keywords Inverted indexing
 index_all_questions_records()
 index_all_answers_records()
     # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
+
