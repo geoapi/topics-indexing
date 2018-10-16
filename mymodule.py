@@ -1,11 +1,13 @@
 import json
 from bson import ObjectId
-
+from timeit import default_timer as timer
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, ObjectId):
             return str(o)
         return json.JSONEncoder.default(self, o)
+
+
 
 #JSONEncoder().encode(analytics) #here analytics is a variable of type dict which will which will be turned into string
 # #make request to get questions based on tag and for one page at time
@@ -40,17 +42,18 @@ def get_qs(tag,page,i):
     print (e - s)
     return
 
-
     #accepts number of questions ids as string, get answers for Qids
 def get_answers(str1):
       import requests
-      import json
       url1 = "https://api.stackexchange.com/2.2/questions/"
-      #url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key=keqVr01zTBktmTggfO2lMg(("
-      url2 = "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody"
+      url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key=keqVr01zTBktmTggfO2lMg(("
+      #url2 = "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody"
       url = url1 + str(str1) + url2
       headers ={"Accept":"application/json", "User-Agent": "RandomHeader"}
       res = requests.get(url,headers)
+      if (res.status_code == 502 or res.status_code == 400):
+          print("You have used your quota for today, will resume later tomorrow!")
+          return None
       return res.json()
 
     #Save one obj into questions collection DB
@@ -65,8 +68,6 @@ def dump_Qs_to_mongoDB(data):
     #x = mycol.insert_many(list1)
     return
 
-
-
     #Save one obj into answers collection DB
 def dump_As_to_mongoDB(data):
       import  pymongo
@@ -77,15 +78,7 @@ def dump_As_to_mongoDB(data):
       mycol.update(data, data, upsert=True)
       return
 
-    # def update_Q_add_AcceptedAnswer(id,ans_obj):
-    #     import pymongo
-    #     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    #     mydb = myclient["api"]
-    #     mycol = mydb["questions"]
-    #     mycol.update({'question_id':id},{'$set':ans_obj})
-    #     return
 
-    #delete content of the collections
 def delete_qs_and_as():
         import pymongo
         myclient = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -95,23 +88,28 @@ def delete_qs_and_as():
         x = mycol1.delete_many({})
         y = mycol2.delete_many({})
         return
-
+#TODO Need optimization i.e. we can have the accepted answer id from the question during its extraction and get it stored immediatly instead of searching all records in mongodb?
 def insert_As_into_Qs_MongoDB():
         import pymongo
         myclient = pymongo.MongoClient("mongodb://localhost:27017/")
         mydb = myclient["api"]
         mycol = mydb["questions"]
-        for x in mycol.find():
+        for x in mycol.find(no_cursor_timeout=True):
             if (x['is_answered']):
+               try:
                 ans_obj = get_answers(x['question_id'])
     #            print(ans_obj['items'])
                 for i in ans_obj['items']:
                     if(i['is_accepted']):
                      #print(i['is_accepted'],i)
                      #update_Q_add_AcceptedAnswer(i['question_id'], i) #this overwrites the body of the question! instead let us store the answer body in the answers collection
-                     dump_As_to_mongoDB(i)
+                      dump_As_to_mongoDB(i)
                     # send the object i of the question i['question_id'] to be stored into mongodb, question id to help find the question
+               except KeyError as error:
+                   print(error)
+        mycol.close()
 
+        return None
 
     # reads posts from questions collections and get useful information like title body etc. and index its content using elk
 def index_all_questions_records():
@@ -124,13 +122,8 @@ def index_all_questions_records():
         mydb = myclient["api"]
         mycol = mydb["questions"]
         #docs=[]
-        for doc in mycol.find():
-            #docs =[doc]
-            #doc = json.dumps(doc)
-           # json.dumps(result, default=json_util.default)
+        for doc in mycol.find(no_cursor_timeout=True):
             loaded_doc =  json.loads(json_util.dumps(doc))
-           # TODO make a question document as the mapping in the index please, and make sure you create the relation to the answer, then get useful answer content as well
-            #loaded_doc['title']
             try:
                 obj = {
                 "body":loaded_doc['body'],
@@ -146,8 +139,8 @@ def index_all_questions_records():
                 }
             except KeyError as error:
                 print(error)
-            #print(obj)
             elasticsearch_questions_posts(obj)
+        mycol.close()
         return
 
 def elasticsearch_questions_posts(doc):
@@ -194,7 +187,7 @@ def index_all_answers_records():
         mydb = myclient["api"]
         mycol = mydb["answers"]
         #docs=[]
-        for loaded_doc in mycol.find():
+        for loaded_doc in mycol.find(no_cursor_timeout=True):
             #docs =[doc]
             #doc = json.dumps(doc)
             #print(loaded_doc)
@@ -219,6 +212,7 @@ def index_all_answers_records():
               }
             except KeyError as error:
                 print(error)
+            mycol.close()
             elasticsearch_answers_posts(obj)
         return
 
@@ -234,10 +228,15 @@ def index_all_answers_records():
     #index all answers posts, make sure each answer is linked to the question and the relation is properly set
     #index_all_answers_records()
     # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
-get_qs('api',1000,1) #first call get questions assuming there are thousand posts starting from the first page
-insert_As_into_Qs_MongoDB() #second or store As seperately
+
+#get_qs('api',1000,1) #first call get questions assuming there are thousand posts starting from the first page  ###1
+#insert_As_into_Qs_MongoDB() #store As seperately                                                                 ###2
+#print(e-s, " timing Answers insertion to MongoDB ")
 #Elasticsearch basic keywords Inverted indexing
+s = timer()
 index_all_questions_records()
 index_all_answers_records()
+e = timer()
+print(e-s, " timing Questions and Answers indexing by ELK ")
     # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
 
