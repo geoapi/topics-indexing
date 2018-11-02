@@ -1,3 +1,6 @@
+#https://stackoverflow.com/questions/tagged/box-api
+#https://stackoverflow.com/questions/tagged/box-api?page=1&sort=votes&pagesize=50
+# To search for say scoups API posts where there is scoups keyword in general in the post and api keyword in the body and title https://api.stackexchange.com/2.2/search/advanced?order=desc&sort=activity&q=scopus&body=api&title=api&site=stackoverflow
 import json
 from bson import ObjectId
 from timeit import default_timer as timer
@@ -6,10 +9,8 @@ class JSONEncoder(json.JSONEncoder):
         if isinstance(o, ObjectId):
             return str(o)
         return json.JSONEncoder.default(self, o)
+#JSONEncoder().encode(analytics) #here analytics is a variable of type dict which will be turned into string
 
-
-
-#JSONEncoder().encode(analytics) #here analytics is a variable of type dict which will which will be turned into string
 # #make request to get questions based on tag and for one page at time
 def get_qs(tag,page,i):
     import requests
@@ -140,11 +141,10 @@ def index_all_questions_records():
             except KeyError as error:
                 print(error)
             elasticsearch_questions_posts(obj)
-        mycol.close()
-        return
+        return None
 
 def elasticsearch_questions_posts(doc):
-        from datetime import datetime
+        #from datetime import datetime
         from elasticsearch import Elasticsearch, helpers
         es = Elasticsearch()
         #print(doc)
@@ -179,9 +179,9 @@ def elasticsearch_answers_posts(doc):
 
 def index_all_answers_records():
         import pymongo, json
-        from bson import Binary, Code, json_util
-        from bson.json_util import dumps
-        import json
+#        from bson import Binary, Code, json_util
+#        from bson.json_util import dumps
+#       import json
 
         myclient = pymongo.MongoClient("mongodb://localhost:27017/")
         mydb = myclient["api"]
