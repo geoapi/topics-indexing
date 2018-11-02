@@ -3,6 +3,13 @@ import json
 import requests
 import pickle
 
+def remove_special_char(s):
+   a = ''.join(filter(str.isalnum, s))
+   return (a)
+
+def remove_numbers_fromStr(s):
+    return ''.join([i for i in s if not i.isdigit()])
+
 def create_index(topics_content,topics_index):
     for i in topics_content:
         t = i['name']
@@ -129,8 +136,8 @@ def init_simple_keyword_index():
     topics_index = defaultdict(list)
     topics_content = doc['topics']
     topics_index = create_index(topics_content,topics_index)
-    print(topics_index)
-    print(topics_index['security'])
+#    print(topics_index)
+#    print(topics_index['security'])
     return (topics_index)
 
 def init_bag_of_keywords_index():
@@ -189,14 +196,12 @@ def find_post(id):
 #save_obj(a, 'myindex')
 
 #here is an example of loading the created index from the pickle file and finding the security keyword
-#a1 = load_obj('myindex')
-#print(a1['security'])
+a1 = init_simple_keyword_index()
+print(a1['security'])
 #for i in a1:
 #    for j in a1[i]:
 #      find_post(j)
 #EO Example
-
-
 
 #print(a['feature'])
 #This indexing is using Wiki WE indexing
@@ -206,7 +211,5 @@ def find_post(id):
 # K/T index ?
 #
 #TODO simple bot reply about topics
-
-
-
-init_topic_keywords_index()
+#TODO
+#init_topic_keywords_index()
