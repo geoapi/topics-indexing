@@ -240,3 +240,4 @@ e = timer()
 print(e-s, " timing Questions and Answers indexing by ELK ")
     # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
 
+#TODO make an advanced search against SO API looking for posts that conatins API keyword in titlte or in the body for a given tag posts
