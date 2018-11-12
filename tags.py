@@ -46,6 +46,9 @@ for atype in e.findall('row'):
         if 'SDK' in k:
             print("SDK found")
             my_list['sdk'].append(tag_n)
+        if 'prgramming language' in k:
+            print("Prog. Lang. found")
+            my_list['pl'].append(tag_n)    
        except KeyError:
            pass
 save_obj(my_list, 'my_api_framework') #save the output dictionary to this file
