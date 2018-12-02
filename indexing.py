@@ -192,12 +192,14 @@ def find_post(id):
 #indexing only API Topics keywords
 #init_simple_keyword_index()
 #indexing using bag of keywords
-#a = init_bag_of_keywords_index()
-#save_obj(a, 'myindex')
+a = init_bag_of_keywords_index()
+save_obj(a, 'myindex')
 
+f = load_obj('myindex')
+print(f['security'])
 #here is an example of loading the created index from the pickle file and finding the security keyword
-a1 = init_simple_keyword_index()
-print(a1['security'])
+#a1 = init_simple_keyword_index()
+#print(a1['authentication'])
 #for i in a1:
 #    for j in a1[i]:
 #      find_post(j)
