@@ -1,3 +1,4 @@
+#SOURCE Spacy Docs
 from __future__ import unicode_literals, print_function
 
 import plac
@@ -10,11 +11,7 @@ from spacy.util import minibatch, compounding
 # new entity label
 LABEL = 'APINAME'
 
-# training data
-# Note: If you're using an existing model, make sure to mix in examples of
-# other entity types that spaCy correctly recognized before. Otherwise, your
-# model might learn the new type, but "forget" what it previously knew.
-# https://explosion.ai/blog/pseudo-rehearsal-catastrophic-forgetting
+# training data sample
 TRAIN_DATA = [
     ("Winapi is a structured API for fetching objects.", {
         'entities': [(0, 6, 'APINAME')]
@@ -28,19 +25,25 @@ TRAIN_DATA = [
         'entities': [(0, 6, 'APINAME')]
     }),
 
-    ("You can pick winapi which is for windows", {
+    ("You can pick winapi which is for windows ..", {
         'entities': [(13, 19, 'APINAME')]
+    }),
+    ("facebook-graph-api is great..", {
+        'entities': [(0, 18, 'APINAME')]
+    }),
+    ("by using facebook-graph-api which is very useful for megreat..", {
+        'entities': [(9, 27, 'APINAME')]
     })
     #,
     #
     # ("ASP.NET Web API is a framework for building HTTP services for clients like browsers and mobile devices. It is based on the Microsoft .NET Framework and an ideal choice for building RESTful services", {
-    #     'entities': [(0, 14, 'API')]
+    #     'entities': [(0, 14, 'APIFRAMEWORK')]
     # }),
     # ("The Instagram API enables the integration of Instagram\'s photos\\videos content and functionality into a website, application or a device. Tag specific questions about the use of Instagram API", {
-    #     'entities': [(4, 17, 'API')]
+    #     'entities': [(4, 17, 'APIFRAMEWORK')]
     # }),
     # ("Use the Gmail API to add Gmail features to your app. RESTful access to threads, messages, labels, drafts and history. Easy to use from modern web languages.", {
-    #     'entities': [(8, 17, 'API')]
+    #     'entities': [(8, 17, 'APIFRAMEWORK')]
     # })
 ]
 
@@ -94,7 +97,7 @@ def main(model=None, new_model_name='api', output_dir=None, n_iter=10):
             print('Losses', losses)
 
     # test the trained model
-    test_text = 'pick Winapi or facebookgraphapi ?'
+    test_text = 'pick Winapi or facebook-graph-api ?'
     doc = nlp(test_text)
     print("Entities in '%s'" % test_text)
     for ent in doc.ents:
@@ -119,3 +122,21 @@ def main(model=None, new_model_name='api', output_dir=None, n_iter=10):
 
 if __name__ == '__main__':
     plac.call(main)
+
+
+# This is how we saved the model from bin to Spacy's
+# >>> for i, line in enumerate(open('SOvec.bin','r')):
+# ...   if i == 0:
+# ...     rows, cols = line.split()
+# ...     rows, cols = int(rows), int(cols)
+# ...     nlp.vocab.reset_vectors(shape=(rows, cols))
+# ...   else:
+# ...     word, *vec = line.split()
+# ...     vec = np.array([float(i) for i in vec])
+# ...     nlp.vocab.set_vector(word, vec)
+# >>> nlp.to_disk('spso')
+
+# prodigy terms.teach api_test1 ./spso --seeds "kylix, gmail-api, winapi, win32, facebook-api"
+# prodigy terms.to-patterns api_test1 api_list_patterns.jsonl --label "APINAME"
+# prodigy dataset api_ner "Train API label"
+# prodigy ner.teach api_ner en_core_web_lg StackSample.jsonl --label APINAME --patterns api_list_patterns.jsonl
