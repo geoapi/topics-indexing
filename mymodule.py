@@ -10,6 +10,7 @@ class JSONEncoder(json.JSONEncoder):
             return str(o)
         return json.JSONEncoder.default(self, o)
 #JSONEncoder().encode(analytics) #here analytics is a variable of type dict which will be turned into string
+key = "keqVr01zTBktmTggfO2lMg((" #get this outside in a config file for example so that the user can define his own
 
 # #make request to get questions based on tag and for one page at time
 def get_qs(tag,page,i):
@@ -25,7 +26,7 @@ def get_qs(tag,page,i):
     url = url + '&tagged=' + tag + "&page=" + str(i)
     res = requests.get(url)
     list1 = res.json()
-    dump_Qs_to_mongoDB(list1)
+    dump_Qs_to_mongoDB(list1,api_name,keyword)
     i += 1
     while (i <= page and list1['has_more'] and list1['quota_remaining'] > 0):
 #        url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100"
@@ -34,7 +35,7 @@ def get_qs(tag,page,i):
         url = url + '&tagged=' + tag + "&page=" + str(i)
         res = requests.get(url)
         list1 = res.json()
-        dump_Qs_to_mongoDB(list1)
+        dump_Qs_to_mongoDB(list1,api_name,keyword)
         i += 1
         if (list1['has_more'] and list1['quota_remaining']==0):
           print('Quota issue, process will resume in 1 day!')
@@ -43,11 +44,34 @@ def get_qs(tag,page,i):
     print (e - s)
     return
 
+    #/ 2.2 / search / advanced?order = desc & sort = activity & q = API + api + winapi & tagged = winapi & site = stackoverflow
+def get_api_qs_with_content(api_name, tag, keyword, page, i):
+        import requests
+        url = "http://api.stackexchange.com/2.2/search/advanced?order=desc&filter=withbody&sort=activity&q="+keyword+"&tagged="+tag+"&site=stackoverflow&pagesize=100&key="+key+ "&page="+ str(i)
+        #    url = "http://api.stackexchange.com/2.2/search?order=desc&sort=votes&site=stackoverflow&filter=withbody&pagesize=100"
+       # url = url + '&tagged=' + tag
+        res = requests.get(url)
+        list1 = res.json()
+        dump_Qs_to_mongoDB(list1,api_name, keyword)
+        i += 1
+        while (i <= page and list1['has_more'] and list1['quota_remaining'] > 0):
+            url ="http://api.stackexchange.com/2.2/search/advanced?order=desc&filter=withbody&sort=activity&q="+keyword+"&tagged="+tag+"&site=stackoverflow&pagesize=100&key="+key+ "&page=" + str(i)
+            res = requests.get(url)
+            list1 = res.json()
+            dump_Qs_to_mongoDB(list1,api_name, keyword)
+            i += 1
+            if (list1['has_more'] and list1['quota_remaining'] == 0):
+                print('Quota issue, process will resume in 1 day!')
+                threading.Timer(86400, get_api_qs_with_content(api_name,tag,keyword,page, i)).start()
+        #e = timer()
+        #print(e - s)
+        return
+
     #accepts number of questions ids as string, get answers for Qids
 def get_answers(str1):
       import requests
       url1 = "https://api.stackexchange.com/2.2/questions/"
-      url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key=keqVr01zTBktmTggfO2lMg(("
+      url2= "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody&key="+key
       #url2 = "/answers?order=desc&sort=activity&site=stackoverflow&filter=withbody"
       url = url1 + str(str1) + url2
       headers ={"Accept":"application/json", "User-Agent": "RandomHeader"}
@@ -58,15 +82,17 @@ def get_answers(str1):
       return res.json()
 
     #Save one obj into questions collection DB
-def dump_Qs_to_mongoDB(data):
+def dump_Qs_to_mongoDB(data,api_name, k):
     import pymongo
     myclient = pymongo.MongoClient("mongodb://localhost:27017/")
     mydb = myclient["api"]
     mycol = mydb["questions"]
     list1 = data['items']
     for item in list1:
-        mycol.update(item,item,upsert=True) # To make sure the document is updated not duplicated
+        item['api']=api_name
+        mycol.update(item, item, upsert=True) # To make sure the document is updated not duplicated
     #x = mycol.insert_many(list1)
+    myclient.close()
     return
 
     #Save one obj into answers collection DB
@@ -89,6 +115,7 @@ def delete_qs_and_as():
         x = mycol1.delete_many({})
         y = mycol2.delete_many({})
         return
+
 #TODO Need optimization i.e. we can have the accepted answer id from the question during its extraction and get it stored immediatly instead of searching all records in mongodb?
 def insert_As_into_Qs_MongoDB():
         import pymongo
@@ -112,34 +139,55 @@ def insert_As_into_Qs_MongoDB():
 
         return None
 
+def rem_dup(it):
+    seen = set()
+    uniq = []
+    for x in it:
+        if x not in seen:
+            uniq.append(x)
+            seen.add(x)
+    return (uniq)
+
     # reads posts from questions collections and get useful information like title body etc. and index its content using elk
 def index_all_questions_records():
         import pymongo, json
         from bson import Binary, Code, json_util
         from bson.json_util import dumps
         import json
-
         myclient = pymongo.MongoClient("mongodb://localhost:27017/")
         mydb = myclient["api"]
         mycol = mydb["questions"]
-        #docs=[]
+        api_name=[]
+        topic_name=[]
         for doc in mycol.find(no_cursor_timeout=True):
             loaded_doc =  json.loads(json_util.dumps(doc))
+            for api_mention in api_dict:
+                if (check_keyword_mention(api_mention['name'],loaded_doc['title']) or check_keyword_mention(api_mention['name'],loaded_doc['body'])  or check_keyword_mention(api_mention['name'],loaded_doc['tags'])):
+                    api_name.append(api_mention['name']);
+                for item in topic_dict:
+                    for key in item['keywords']:
+                        if (check_keyword_mention(key, loaded_doc['title']) or check_keyword_mention(key, loaded_doc['body'])):
+                            topic_name.append(item['name'])
+            api_name = rem_dup(api_name)
+            topic_name = rem_dub(topic_name)
             try:
                 obj = {
                 "body":loaded_doc['body'],
                 "title":loaded_doc['title'],
                 "tags":loaded_doc['tags'],
-                "view_count": loaded_doc['view_count'],
-                "owner":loaded_doc['owner']['user_id'],
+                #"view_count": loaded_doc['view_count'],
+                #"owner":loaded_doc['owner']['user_id'],
                 "question_id":loaded_doc['question_id'],
-                "score":loaded_doc['score'],
+                #"score":loaded_doc['score'],
+                "api":api_name, #TODO makeit a function detector
+                "topic":topic_name,
                 "my_join_field": {
-                    "name": "q",
+                    "name": "q"
                  }
                 }
             except KeyError as error:
                 print(error)
+
             elasticsearch_questions_posts(obj)
         return None
 
@@ -147,12 +195,8 @@ def elasticsearch_questions_posts(doc):
         #from datetime import datetime
         from elasticsearch import Elasticsearch, helpers
         es = Elasticsearch()
-        #print(doc)
-        #get Qs from the DB
-        # for each Q or doc make an index post for example a test-index type as tweet post doc
         res = es.index(index="question", doc_type='so', id=doc['question_id'], body=doc)
         print(res['result'])
-        # get request to Elk
         res = es.get(index="question", doc_type='so', id=doc['question_id'])
         print(res['_source'])
         es.indices.refresh(index="question")
@@ -201,9 +245,9 @@ def index_all_answers_records():
                # "answer_title":loaded_doc['title'],
                # "tags":loaded_doc['tags'],
                 #"view_count": loaded_doc['view_count'],
-                "answer_owner":loaded_doc['owner']['user_id'],
+                #"answer_owner":loaded_doc['owner']['user_id'],
                 "answer_id":loaded_doc['answer_id'],
-                "score":loaded_doc['score'],
+                #"score":loaded_doc['score'],
                 "question_id":loaded_doc['question_id'],
                 "my_join_field": {
                      "name": "a",
@@ -212,18 +256,80 @@ def index_all_answers_records():
               }
             except KeyError as error:
                 print(error)
-            mycol.close()
+#            mycol.close()
             elasticsearch_answers_posts(obj)
         return
 
+#This is good to find the number of hits
+def elasticsearch_topic_search_hits(keyword):
+    # from datetime import datetime
+    from elasticsearch import Elasticsearch, helpers
+    import elasticsearch.helpers
+    # from elasticsearch_dsl import Search
+    # s = Search(using=client, index="my-index") \
+    #     .filter("term", category="search") \
+    #     .query("match", title="python") \
+    #     .exclude("match", description="beta")
+
+    es = Elasticsearch()
+    # res = es.search(index="question", body={"query": {
+    #     "match" : {
+    #         "title" : keyword
+    #     }
+    # },
+    # "size": 2,
+    # "from": 0,
+    # "_source": [ "title", "body", "tags" ],
+    # "highlight": {
+    #     "fields" : { "title" : {} }
+    # }})
+
+    res = es.search(index="question", body={"query": {
+        "match": {
+            "body": keyword
+        }
+    },
+        "size": 2,
+        "from": 0,
+        "_source": ["body", "tags"],
+        "highlight": {
+            "fields": {"body": {}}
+        }})
+    print("Got %d Hits:" % res['hits']['total'])
+    for hit in res['hits']['hits']:
+        print("%(tags)s : %(body)s" % hit["_source"])
+    return
 
 
-    # Here you can specify the number of pages where each page is 100 Questions
+
+#TODO this function returns the first ten posts only, read about scan and pagination at https://elasticsearch-dsl.readthedocs.io/en/latest/search_dsl.html#hits
+def elasticsearch_topic_search_content(keyword):
+    from elasticsearch import Elasticsearch
+    from elasticsearch_dsl import Search
+    client = Elasticsearch()
+    s = Search(using=client)
+    s = s.using(client)
+    s = Search().using(client).query("match", title=keyword)
+    response = s.execute()
+    for hit in s:
+         print(hit.title)
+    return
+
+def check_keyword_mention(keyword,text):
+    if keyword in text:
+        return True
+    else:
+        return False
+
+
+
+
+# Here you can specify the number of pages where each page is 100 Questions
     #This is where the requests to store questions begins here only 300 questions
     #get_qs('api',3) #first
     #insert_As_into_Qs_MongoDB() #second or store As seperately
 #delete_qs_and_as() #restart and reset DB
-    #index all questions posts
+#index all questions posts
     #index_all_questions_records()
     #index all answers posts, make sure each answer is linked to the question and the relation is properly set
     #index_all_answers_records()
@@ -233,11 +339,81 @@ def index_all_answers_records():
 #insert_As_into_Qs_MongoDB() #store As seperately                                                                 ###2
 #print(e-s, " timing Answers insertion to MongoDB ")
 #Elasticsearch basic keywords Inverted indexing
-s = timer()
+
+api_dict = [
+            # {"name":"facebook",
+            #  "keywords":["facebook graph api", "facebook API", "facebook api", "FB API", "fb api"],
+            #  "tag":"facebook-graph-api"},
+            # {"name":"twitter",
+            #  "keywords":["twitter api", "Twitter API"],
+            #  "tag":"twitter-api"},
+            {"name":"winapi",
+             "keywords":["Winapi","win api", "WINAPI", "win32 api", "Windows API","The Windows API"],
+             "tag":"winapi"}]
+
+topic_dict = [
+    {"id":0,"name":"security","category_id":0, "keywords":["security"]},
+    {"id":1,"name":"oauth configuration","category_id":0,"keywords":["oauth","authentication","configuration","settings"]},
+    {"id":2,"name":"oauth clarification","category_id":0,"keywords":["oauth","understand","clarify"]},
+ #   {"id":3,"name":"api constraints","category_id":1,"parent":true,"keywords":["restrictions"]},
+ #   {"id":4,"name":"possibility of a functionality","category_id":1,"parent":false,"keywords":["possible","feasible","functionality"]},
+ #   {"id":5,"name":"understanding usage limitation","category_id":1,"parent":false,"keywords":["limited","restricted","understanding"]},
+    {"id":6,"name":"debugging","category_id":2,"keywords":["debug","fix","error","log"]},
+    {"id":7,"name":"request","category_id":2,"keywords":["request","call","invocation"]},
+    {"id":8,"name":"behaviour","category_id":2,"keywords":["behaviour","act"]},
+    {"id":9,"name":"parameters","category_id":2,"keywords":["param","parameter"]},
+    {"id":10,"name":"returned data","category_id":2,"keywords":["returned","requested","data"]},
+    {"id":11,"name":"settings","category_id":3,"keywords":["settings","configuration"]},
+    {"id":12,"name":"usage","category_id":4,"keywords":["usage","use","example"]},
+ #   {"id":13,"name":"features implementation feasibility","category_id":4,"parent":false,"keywords":["feature","feasible","possible"]},
+    {"id":14,"name":"understanding functionality","category_id":4,"keywords":["function"]},
+ #   {"id":15,"name":"seeking alternative implementation","category_id":4,"parent":false,"keywords":["alternative","way","another"]},
+ #   {"id":16,"name":"development environment","category_id":4,"parent":false,"keywords":["environment","development"]},
+ #   {"id":17,"name":"examples","category_id":4,"parent":false,"keywords":["example","code"]},
+    {"id":18,"name":"documentation","category_id":5,"keywords":["documentation","reference"]},
+    {"id":19,"name":"redirection","category_id":5,"keywords":["redirect"]},
+    {"id":20,"name":"reporting issues","category_id":5,"keywords":["typo","mistake","error","bug"]},
+  #  {"id":21,"name":"definition","category_id":6,"parent":true,"keywords":["definition"]},
+    {"id":22,"name":"design patterns","category_id":6,"keywords":["design","pattern"]},
+    {"id":23,"name":"version management","category_id":6,"keywords":["version"]},
+    {"id":24,"name":"setting parameters","category_id":6,"keywords":["setting","configuration","parameter"]},
+    {"id":25,"name":"recommendation","category_id":6,"keywords":["recommend","suggest"]}
+    ]
+
+#def extractor(api_dict):
+#iterate through all apis taking all possible searches keywords for 10 pages each with 100 items(Qs)
+ # for item in api_dict:
+ #    tag = item['tag']
+ #    item_keywords = item['keywords']
+ #    api_name = item['name']
+ #    for k in item_keywords:
+ #        get_api_qs_with_content(api_name,tag, k , 5, 1)
+
+
+
+
+#get all the answers content to DB
+#insert_As_into_Qs_MongoDB()
+#for idx count 5 lines
+# s = timer()
+
+#extractor(api_dict)
 index_all_questions_records()
-index_all_answers_records()
-e = timer()
-print(e-s, " timing Questions and Answers indexing by ELK ")
-    # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
+#index_all_answers_records()
+
+#This need TODO while extracting api inspect topics as well
+
+#Search result without content , useful to find number of hits
+#res = elasticsearch_topic_search("API")
+
+
+#now return search results with content using keyword in title? 1/12/2018
+#elasticsearch_topic_search_content("API")
+
+#update_elk_index_add_topic("security", res)
+
+# e = timer()
+# print(e-s, " timing Questions and Answers indexing by ELK ")
+# if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
 
 #TODO make an advanced search against SO API looking for posts that conatins API keyword in titlte or in the body for a given tag posts
