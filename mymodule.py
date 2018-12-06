@@ -136,19 +136,9 @@ def insert_As_into_Qs_MongoDB():
                except KeyError as error:
                    print(error)
         mycol.close()
-
         return None
 
-def rem_dup(it):
-    seen = set()
-    uniq = []
-    for x in it:
-        if x not in seen:
-            uniq.append(x)
-            seen.add(x)
-    return (uniq)
-
-    # reads posts from questions collections and get useful information like title body etc. and index its content using elk
+# reads posts from questions collections and get useful information like title body etc. and index its content using elk
 def index_all_questions_records():
         import pymongo, json
         from bson import Binary, Code, json_util
@@ -157,19 +147,23 @@ def index_all_questions_records():
         myclient = pymongo.MongoClient("mongodb://localhost:27017/")
         mydb = myclient["api"]
         mycol = mydb["questions"]
-        api_name=[]
-        topic_name=[]
+
         for doc in mycol.find(no_cursor_timeout=True):
+            api_name = []
+            topic_name = []
             loaded_doc =  json.loads(json_util.dumps(doc))
             for api_mention in api_dict:
+               try:
                 if (check_keyword_mention(api_mention['name'],loaded_doc['title']) or check_keyword_mention(api_mention['name'],loaded_doc['body'])  or check_keyword_mention(api_mention['name'],loaded_doc['tags'])):
                     api_name.append(api_mention['name']);
                 for item in topic_dict:
                     for key in item['keywords']:
                         if (check_keyword_mention(key, loaded_doc['title']) or check_keyword_mention(key, loaded_doc['body'])):
                             topic_name.append(item['name'])
-            api_name = rem_dup(api_name)
-            topic_name = rem_dub(topic_name)
+               except KeyError as error:
+                    print(error)
+            api_name = remove_dup(api_name)
+            topic_name = remove_dup(topic_name)
             try:
                 obj = {
                 "body":loaded_doc['body'],
@@ -190,6 +184,16 @@ def index_all_questions_records():
 
             elasticsearch_questions_posts(obj)
         return None
+
+def remove_dup(it):
+    seen = set()
+    uniq = []
+    for x in it:
+        if x not in seen:
+            uniq.append(x)
+            seen.add(x)
+    return (uniq)
+
 
 def elasticsearch_questions_posts(doc):
         #from datetime import datetime
@@ -321,7 +325,15 @@ def check_keyword_mention(keyword,text):
     else:
         return False
 
-
+# Get synonyms from WordNet
+def get_syn(keyword):
+ import nltk
+ from nltk.corpus import wordnet
+ synonyms = []
+ for syn in wordnet.synsets(keyword):
+   for l in syn.lemmas():
+     synonyms.append(l.name())
+ return synonyms
 
 
 # Here you can specify the number of pages where each page is 100 Questions
@@ -341,53 +353,49 @@ def check_keyword_mention(keyword,text):
 #Elasticsearch basic keywords Inverted indexing
 
 api_dict = [
-            # {"name":"facebook",
-            #  "keywords":["facebook graph api", "facebook API", "facebook api", "FB API", "fb api"],
-            #  "tag":"facebook-graph-api"},
-            # {"name":"twitter",
-            #  "keywords":["twitter api", "Twitter API"],
-            #  "tag":"twitter-api"},
-            {"name":"winapi",
-             "keywords":["Winapi","win api", "WINAPI", "win32 api", "Windows API","The Windows API"],
-             "tag":"winapi"}]
+             {"name":"facebook","keywords":["facebook graph api", "facebook API", "facebook api", "FB API", "fb api"],"tag":"facebook-graph-api"},
+             {"name":"twitter", "keywords":["twitter api", "Twitter API"], "tag":"twitter-api"},
+             {"name":"winapi","keywords":["Winapi","win api", "WINAPI", "win32 api", "Windows API","The Windows API"],"tag":"winapi"},
+             {"name":"gmail", "keywords":["Google GMail api", "Gmail API"], "tag":"gmail-api"},
+            ]
 
 topic_dict = [
     {"id":0,"name":"security","category_id":0, "keywords":["security"]},
     {"id":1,"name":"oauth configuration","category_id":0,"keywords":["oauth","authentication","configuration","settings"]},
-    {"id":2,"name":"oauth clarification","category_id":0,"keywords":["oauth","understand","clarify"]},
+    {"id":2,"name":"oauth clarification","category_id":0,"keywords":["oauth"]}, #,"understand","clarify" take out as they are not necessarly related to oauth
  #   {"id":3,"name":"api constraints","category_id":1,"parent":true,"keywords":["restrictions"]},
  #   {"id":4,"name":"possibility of a functionality","category_id":1,"parent":false,"keywords":["possible","feasible","functionality"]},
  #   {"id":5,"name":"understanding usage limitation","category_id":1,"parent":false,"keywords":["limited","restricted","understanding"]},
-    {"id":6,"name":"debugging","category_id":2,"keywords":["debug","fix","error","log"]},
-    {"id":7,"name":"request","category_id":2,"keywords":["request","call","invocation"]},
-    {"id":8,"name":"behaviour","category_id":2,"keywords":["behaviour","act"]},
+    {"id":6,"name":"debugging","category_id":2,"keywords":["debug","fix","error","bug"]},
+ #   {"id":7,"name":"request","category_id":2,"keywords":["request","call","invocation"]},
+    {"id":8,"name":"behaviour","category_id":2,"keywords":["behaviour"]},
     {"id":9,"name":"parameters","category_id":2,"keywords":["param","parameter"]},
     {"id":10,"name":"returned data","category_id":2,"keywords":["returned","requested","data"]},
     {"id":11,"name":"settings","category_id":3,"keywords":["settings","configuration"]},
     {"id":12,"name":"usage","category_id":4,"keywords":["usage","use","example"]},
  #   {"id":13,"name":"features implementation feasibility","category_id":4,"parent":false,"keywords":["feature","feasible","possible"]},
-    {"id":14,"name":"understanding functionality","category_id":4,"keywords":["function"]},
+ #   {"id":14,"name":"understanding functionality","category_id":4,"keywords":["how to do"]},
  #   {"id":15,"name":"seeking alternative implementation","category_id":4,"parent":false,"keywords":["alternative","way","another"]},
  #   {"id":16,"name":"development environment","category_id":4,"parent":false,"keywords":["environment","development"]},
  #   {"id":17,"name":"examples","category_id":4,"parent":false,"keywords":["example","code"]},
-    {"id":18,"name":"documentation","category_id":5,"keywords":["documentation","reference"]},
+    {"id":18,"name":"documentation","category_id":5,"keywords":["documentation","docs","reference"]},
     {"id":19,"name":"redirection","category_id":5,"keywords":["redirect"]},
-    {"id":20,"name":"reporting issues","category_id":5,"keywords":["typo","mistake","error","bug"]},
+    {"id":20,"name":"reporting issues","category_id":5,"keywords":["typo","mistake","error"]},
   #  {"id":21,"name":"definition","category_id":6,"parent":true,"keywords":["definition"]},
-    {"id":22,"name":"design patterns","category_id":6,"keywords":["design","pattern"]},
+    {"id":22,"name":"design patterns","category_id":6,"keywords":["design","design-pattern","design-patterns"]},
     {"id":23,"name":"version management","category_id":6,"keywords":["version"]},
-    {"id":24,"name":"setting parameters","category_id":6,"keywords":["setting","configuration","parameter"]},
-    {"id":25,"name":"recommendation","category_id":6,"keywords":["recommend","suggest"]}
+    {"id":24,"name":"setting parameters","category_id":6,"keywords":["setting","parameter"]},
+    {"id":25,"name":"recommendation","category_id":6,"keywords":["recommend"]}
     ]
 
-#def extractor(api_dict):
+def extractor(api_dict):
 #iterate through all apis taking all possible searches keywords for 10 pages each with 100 items(Qs)
- # for item in api_dict:
- #    tag = item['tag']
- #    item_keywords = item['keywords']
- #    api_name = item['name']
- #    for k in item_keywords:
- #        get_api_qs_with_content(api_name,tag, k , 5, 1)
+ for item in api_dict:
+    tag = item['tag']
+    item_keywords = item['keywords']
+    api_name = item['name']
+    for k in item_keywords:
+        get_api_qs_with_content(api_name,tag, k , 999, 1)
 
 
 
@@ -395,7 +403,7 @@ topic_dict = [
 #get all the answers content to DB
 #insert_As_into_Qs_MongoDB()
 #for idx count 5 lines
-# s = timer()
+s = timer()
 
 #extractor(api_dict)
 index_all_questions_records()
@@ -412,8 +420,8 @@ index_all_questions_records()
 
 #update_elk_index_add_topic("security", res)
 
-# e = timer()
-# print(e-s, " timing Questions and Answers indexing by ELK ")
+e = timer()
+print(e-s, " timing Questions and Answers indexing by ELK ")
 # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
 
 #TODO make an advanced search against SO API looking for posts that conatins API keyword in titlte or in the body for a given tag posts
