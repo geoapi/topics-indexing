@@ -138,6 +138,66 @@ def insert_As_into_Qs_MongoDB():
         mycol.close()
         return None
 
+
+
+#index based on specific API
+def index_one_api_questions_records(api_keyword):
+    import pymongo, json
+    from bson import Binary, Code, json_util
+    from bson.json_util import dumps
+    import json
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    mydb = myclient["api"]
+    mycol = mydb["questions"]
+
+    for doc in mycol.find({ "$and":[{'api':{'$regex': api_keyword}}]},no_cursor_timeout=True):
+        api_name = []
+        topic_name = []
+        loaded_doc = json.loads(json_util.dumps(doc))
+        for api_mention in api_dict:
+            try:
+                if (check_keyword_mention(api_mention['name'], loaded_doc['title']) or check_keyword_mention(
+                        api_mention['name'], loaded_doc['body']) or check_keyword_mention(api_mention['name'],
+                                                                                          loaded_doc['tags'])):
+                    api_name.append(api_mention['name'])
+                for item in topic_dict:
+                    for key in item['keywords']:
+                        if (check_keyword_mention(key, loaded_doc['title']) or check_keyword_mention(key, loaded_doc[
+                            'body'])):
+                            topic_name.append(item['name'])
+                            # TODO ADD to an api mention elements from the enrichment Word Embedding and Word Net
+                            for syn1 in synonyms_wordnet:
+                                if (syn1["keywords"] == item['name']):
+                                    for key_syn in syn1["synonyms"]:
+                                        topic_name.append(key_syn)
+            except KeyError as error:
+                print(error)
+        api_name = remove_dup(api_name)
+        topic_name = remove_dup(topic_name)
+        try:
+            obj = {
+                "body": loaded_doc['body'],
+                "title": loaded_doc['title'],
+                "tags": loaded_doc['tags'],
+                # "view_count": loaded_doc['view_count'],
+                # "owner":loaded_doc['owner']['user_id'],
+                "question_id": loaded_doc['question_id'],
+                # "score":loaded_doc['score'],
+                "api": api_name,  # TODO makeit a function detector
+                "topic": topic_name,
+                "my_join_field": {
+                    "name": "q"
+                }
+            }
+        except KeyError as error:
+            print(error)
+
+        elasticsearch_questions_posts(obj)
+    return None
+
+
+
+
 # reads posts from questions collections and get useful information like title body etc. and index its content using elk
 def index_all_questions_records():
         import pymongo, json
@@ -353,10 +413,39 @@ def get_syn(keyword):
 #Elasticsearch basic keywords Inverted indexing
 
 api_dict = [
-             {"name":"facebook","keywords":["facebook graph api", "facebook API", "facebook api", "FB API", "fb api"],"tag":"facebook-graph-api"},
-             {"name":"twitter", "keywords":["twitter api", "Twitter API"], "tag":"twitter-api"},
-             {"name":"winapi","keywords":["Winapi","win api", "WINAPI", "win32 api", "Windows API","The Windows API"],"tag":"winapi"},
-             {"name":"gmail", "keywords":["Google GMail api", "Gmail API"], "tag":"gmail-api"},
+             # {"name":"facebook","keywords":["facebook graph api", "facebook API", "facebook api", "FB API", "fb api"],"tag":"facebook-graph-api"},
+             # {"name":"twitter", "keywords":["twitter api", "Twitter API"], "tag":"twitter-api"},
+             # {"name":"winapi","keywords":["Winapi","win api", "WINAPI", "win32 api", "Windows API","The Windows API"],"tag":"winapi"},
+             # {"name":"gmail", "keywords":["Google GMail api", "Gmail API"], "tag":"gmail-api"},
+             # {"name":"java", "keywords":["Java api", "Java API"], "tag":"java-api"},
+             # {"name": "youtube", "keywords": ["YouTube API"], "tag": "youtube-api"},
+             # {"name": "googleplaces", "keywords": ["Google Places API"], "tag": "google-places-api"},
+             # {"name": "instagram", "keywords": ["instagram api","Instagram API"], "tag": "instagram-api"}
+             #  ,
+             #  {"name": "youtube", "keywords": ["youtube api"], "tag": "youtube-api"}
+             # ,
+              {"name": "gmail", "keywords": ["gmail api"], "tag": "gmail-api"}
+             #,
+             # {"name": "", "keywords": [""], "tag": ""}
+             # # ,
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+             # {"name": "", "keywords": [""], "tag": ""},
+
             ]
 
 topic_dict = [
@@ -388,6 +477,67 @@ topic_dict = [
     {"id":25,"name":"recommendation","category_id":6,"keywords":["recommend"]}
     ]
 
+
+
+synonyms_wordnet = [
+    {"keywords": "security","synonyms":[ "protection", "certificate"]},
+    {"keywords":"authentication","synonyms":["authentication", "certification"]},
+    {"keywords": "configuration",
+     "synonyms":[ "shape", "form", "contour", "conformation"]},
+    {"keywords": "settings",
+     "synonyms":
+         ["setting", "scene", "setting", "background", "scope", "mise_en_scene", "stage_setting", "setting", "context", "circumstance"]},
+    {"keywords": "understand",
+     "synonyms":
+         ["understand", "understand", "realize", "realise", "see", "read", "interpret", "translate", "infer", "sympathize"]},
+    {"keywords": "clarify",
+     "synonyms":
+         ["clarify", "clear_up", "elucidate", "clarify"]},
+    {"keywords": "fix",
+     "synonyms":
+         ["fix", "repair", "fixing", "fixture", "mend", "mending", "reparation", "localization", "localisation","set"]},
+    {"keywords": "error",
+     "synonyms":
+         ["mistake", "error", "fault", "erroneousness", "error", "wrongdoing", "computer_error", "error", "mistake"]},
+    {"keywords": "behaviour",
+     "synonyms":
+      ['behavior', 'demeanor', 'demeanour', 'behavior', 'behaviour', 'conduct', 'doings']},
+    {"keywords": "parameters",
+     "synonyms":['parameter', 'argument']},
+    {"keywords": "returned",
+     "synonyms":['return', 'render', 'revert', 'retrovert', 'regress', 'recall', 'rejoin', 'refund', 'repay']},
+    {"keywords": "requested",
+         "synonyms":['request', 'bespeak', 'quest', 'request', 'request', 'requested']},
+    {"keywords": "data",
+         "synonyms":['data', 'information', 'datum']},
+    {"keywords": "settings",
+         "synonyms":['setting', 'scene', 'background', 'scope', 'context', 'circumstance', 'mount']},
+    {"keywords": "usage",
+         "synonyms":['use', 'utilization', 'utilisation', 'employment', 'exercise', 'custom', 'usance']},
+    {"keywords": "use",
+         "synonyms":['usage', 'utilization', 'utilisation', 'employment', 'exercise', 'function', 'purpose', 'role', 'consumption', 'usance']},
+    {"keywords": "example",
+         "synonyms":['illustration', 'instance', 'representative', 'model', 'exemplar', 'case', 'instance', 'exercise']
+    },
+    {"keywords": "documentation",
+         "synonyms":['certification','support']},
+    {"keywords": "mistake",
+         "synonyms":['error', 'fault', 'misunderstanding', 'misapprehension', 'misidentify', 'err', 'mistake', 'slip']},
+    {"keywords": "design",
+         "synonyms":['designing', 'plan', 'blueprint', 'figure', 'purpose', 'intent', 'intention', 'aim', 'invention', 'conception']},
+    {"keywords": "recommend",
+         "synonyms":['urge', 'advocate', 'commend']}
+    ]
+
+
+
+
+
+
+
+
+
+
 def extractor(api_dict):
 #iterate through all apis taking all possible searches keywords for 10 pages each with 100 items(Qs)
  for item in api_dict:
@@ -398,15 +548,17 @@ def extractor(api_dict):
         get_api_qs_with_content(api_name,tag, k , 999, 1)
 
 
-
-
 #get all the answers content to DB
 #insert_As_into_Qs_MongoDB()
 #for idx count 5 lines
 s = timer()
 
 #extractor(api_dict)
-index_all_questions_records()
+#index_all_questions_records()
+
+#useful for one API extraction
+index_one_api_questions_records("gmail")
+
 #index_all_answers_records()
 
 #This need TODO while extracting api inspect topics as well
