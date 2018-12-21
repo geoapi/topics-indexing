@@ -330,26 +330,7 @@ def index_all_answers_records():
 def elasticsearch_topic_search_hits(keyword):
     # from datetime import datetime
     from elasticsearch import Elasticsearch, helpers
-    import elasticsearch.helpers
-    # from elasticsearch_dsl import Search
-    # s = Search(using=client, index="my-index") \
-    #     .filter("term", category="search") \
-    #     .query("match", title="python") \
-    #     .exclude("match", description="beta")
-
     es = Elasticsearch()
-    # res = es.search(index="question", body={"query": {
-    #     "match" : {
-    #         "title" : keyword
-    #     }
-    # },
-    # "size": 2,
-    # "from": 0,
-    # "_source": [ "title", "body", "tags" ],
-    # "highlight": {
-    #     "fields" : { "title" : {} }
-    # }})
-
     res = es.search(index="question", body={"query": {
         "match": {
             "body": keyword
@@ -365,6 +346,35 @@ def elasticsearch_topic_search_hits(keyword):
     for hit in res['hits']['hits']:
         print("%(tags)s : %(body)s" % hit["_source"])
     return
+
+#search for a specific topic based on the topic mentions
+def elasticsearch_topic_search_keyword(keyword):
+    from elasticsearch import Elasticsearch
+    from elasticsearch_dsl import Search
+    client = Elasticsearch()
+    s = Search(using=client)
+    s = s.using(client)
+    s = Search().using(client).query("match", topic=keyword)
+    response = s.execute()
+    for hit in s:
+         print(hit.title)
+    return
+
+
+
+#search for a specific topic based on the topic mentions
+def elasticsearch_api_search_keyword(keyword):
+    from elasticsearch import Elasticsearch
+    from elasticsearch_dsl import Search
+    client = Elasticsearch()
+    s = Search(using=client)
+    s = s.using(client)
+    s = Search().using(client).query("match", api=keyword)
+    response = s.execute()
+    for hit in s:
+         print(hit.title)
+    return
+
 
 
 
@@ -402,6 +412,92 @@ def get_syn(keyword):
      synonyms.append(l.name())
  return synonyms
 
+
+
+def elastic_request_api(api_name):
+    from elasticsearch import Elasticsearch
+    es = Elasticsearch()
+    #url = "http://localhost:9200/question/_search?"
+    params = json.dumps({
+        "query": {
+            "query_string": {
+                "query": api_name,
+                "fields": ["api"],
+            }
+        }
+    })
+    data = es.search(index="question", doc_type="so", body=params, size=20)
+    if (data['hits']['total'] > 0):
+        data2 = data['hits']['hits']
+    else:
+        data2 =[]
+    return (data['hits']['total'], data2)
+
+
+def elastic_request_topic(topic_name):
+    from elasticsearch import Elasticsearch
+    es = Elasticsearch()
+    #url = "http://localhost:9200/question/_search?"
+    params = json.dumps({
+        "query": {
+            "query_string": {
+                "query": topic_name,
+                "fields": ["topic"],
+            }
+        }
+    })
+    data = es.search(index="question", doc_type="so", body=params, size=20)
+    if (data['hits']['total'] > 0):
+        data2 = data['hits']['hits']
+    else:
+        data2 =[]
+    return (data['hits']['total'], data2)
+
+
+
+def elastic_request_apiAndtopic(topic_name,api_name):
+    from elasticsearch import Elasticsearch
+    es = Elasticsearch()
+    params = json.dumps({
+        "query": {
+            "bool": {
+              "must": [{
+                  "match": {
+                      "api": api_name[0]
+                  }
+              }, {
+                  "match": {
+                      "topic": topic_name[0]
+                  }
+              }]
+            }
+        }
+    })
+    data = es.search(index="question", doc_type="so", body=params, size=20)
+    if (data['hits']['total'] > 0):
+        data2 = data['hits']['hits']
+    else:
+        data2 =[]
+    return (data['hits']['total'], data2)
+
+
+
+
+def check_dsl_string(dsl_string):
+    import spacy
+    nlp = spacy.load('en')
+    topic_name = []
+    api_name = []
+    document = nlp(dsl_string)
+    lemmas = [token.lemma_ for token in document if not token.is_stop]
+    j = 0
+    while j < len(lemmas):
+        if (lemmas[j]=="topic"):
+            topic_name.append(lemmas[j+2])
+        if (lemmas[j]=="api"):
+            api_name.append(lemmas[j+2])
+        j=j+3
+    return(topic_name,api_name)
 
 # Here you can specify the number of pages where each page is 100 Questions
     #This is where the requests to store questions begins here only 300 questions
@@ -452,28 +548,28 @@ api_dict = [
             ]
 
 topic_dict = [
-    {"id":0,"name":"security","category_id":0, "keywords":["security"]},
+    {"id":0,"name":"API security","category_id":0, "keywords":["security"]},
     {"id":1,"name":"oauth configuration","category_id":0,"keywords":["oauth","authentication","configuration","settings"]},
     {"id":2,"name":"oauth clarification","category_id":0,"keywords":["oauth"]}, #,"understand","clarify" take out as they are not necessarly related to oauth
- #   {"id":3,"name":"api constraints","category_id":1,"parent":true,"keywords":["restrictions"]},
- #   {"id":4,"name":"possibility of a functionality","category_id":1,"parent":false,"keywords":["possible","feasible","functionality"]},
- #   {"id":5,"name":"understanding usage limitation","category_id":1,"parent":false,"keywords":["limited","restricted","understanding"]},
+    {"id":3,"name":"api constraints","category_id":1,"keywords":["restrictions"]},
+    {"id":4,"name":"possibility of a functionality","category_id":1,"keywords":["possible","feasible","doable"]},
+    {"id":5,"name":"understanding usage limitation","category_id":1,"keywords":["limited","restricted","impossible"]},
     {"id":6,"name":"debugging","category_id":2,"keywords":["debug","fix","error","bug"]},
- #   {"id":7,"name":"request","category_id":2,"keywords":["request","call","invocation"]},
+    {"id":7,"name":"request","category_id":2,"keywords":["request","call","invocation"]},
     {"id":8,"name":"behaviour","category_id":2,"keywords":["behaviour"]},
     {"id":9,"name":"parameters","category_id":2,"keywords":["param","parameter"]},
     {"id":10,"name":"returned data","category_id":2,"keywords":["returned","requested","data"]},
     {"id":11,"name":"settings","category_id":3,"keywords":["settings","configuration"]},
     {"id":12,"name":"usage","category_id":4,"keywords":["usage","use","example"]},
- #   {"id":13,"name":"features implementation feasibility","category_id":4,"parent":false,"keywords":["feature","feasible","possible"]},
- #   {"id":14,"name":"understanding functionality","category_id":4,"keywords":["how to do"]},
- #   {"id":15,"name":"seeking alternative implementation","category_id":4,"parent":false,"keywords":["alternative","way","another"]},
- #   {"id":16,"name":"development environment","category_id":4,"parent":false,"keywords":["environment","development"]},
- #   {"id":17,"name":"examples","category_id":4,"parent":false,"keywords":["example","code"]},
+    #{"id":13,"name":"features implementation feasibility","category_id":4,"parent":false,"keywords":["feature","feasible","possible"]},
+    {"id":14,"name":"understanding functionality","category_id":4,"keywords":["how to","need to","know"]},
+    {"id":15,"name":"seeking alternative implementation","category_id":4,"keywords":["alternative","way","another"]},
+    {"id":16,"name":"development environment","category_id":4,"keywords":["environment","development","development-mode"]},
+    {"id":17,"name":"examples","category_id":4,"keywords":["example","code"]},
     {"id":18,"name":"documentation","category_id":5,"keywords":["documentation","docs","reference"]},
     {"id":19,"name":"redirection","category_id":5,"keywords":["redirect"]},
     {"id":20,"name":"reporting issues","category_id":5,"keywords":["typo","mistake","error"]},
-  #  {"id":21,"name":"definition","category_id":6,"parent":true,"keywords":["definition"]},
+    {"id":21,"name":"definition","category_id":6,"keywords":["definition"]},
     {"id":22,"name":"design patterns","category_id":6,"keywords":["design","design-pattern","design-patterns"]},
     {"id":23,"name":"version management","category_id":6,"keywords":["version"]},
     {"id":24,"name":"setting parameters","category_id":6,"keywords":["setting","parameter"]},
@@ -585,7 +681,7 @@ def remove_typos_from(so_embedding):
 
 
 def extractor(api_dict):
-#iterate through all apis taking all possible searches keywords for 10 pages each with 100 items(Qs)
+#iterate through all apis taking all possible searches keywords for 999 pages each with 100 items(Qs)
  for item in api_dict:
     tag = item['tag']
     item_keywords = item['keywords']
@@ -602,12 +698,14 @@ s = timer()
 #extractor(api_dict)
 #index_all_questions_records()
 
-so_embedding = remove_typos_from(so_embedding)
+#cleanup so word embedding from words with typos, please note that oauth1 may be deleted as its not an English word. Required when you want to index
+#so_embedding = remove_typos_from(so_embedding)
 
 #useful for one API extraction for effiecieny and speed. Esepcially when monitoring only one API of interest
-for key1 in api_dict:
-    index_one_api_questions_records(key1['name'])
+#for key1 in api_dict:
+#  index_one_api_questions_records(key1['name'])
 
+#elasticsearch_topic_search_keyword("security")
 #index_all_answers_records()
 
 #This need TODO while extracting api inspect topics as well
@@ -621,8 +719,24 @@ for key1 in api_dict:
 
 #update_elk_index_add_topic("security", res)
 
+#Get number of posts that we tagged with an API e.g. facebook and the top 20 posts, the size can be changed to whatever needed
+#a = elastic_request_api("facebook")
+#print(a)
+
+#Get number of posts that is related to topic e.g. debugging and the top 20 posts content
+#a= elastic_request_topic("debugging")
+#print(a)
+
+#get string that contains dsl query and identify topic names and api names and return dictionary for both
+a = check_dsl_string("topic:security api:facebook")
+print(a)
+#get search results for a topic and an API as returned by the query.
+k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
+print(k)
+
 e = timer()
 print(e-s, " timing Questions and Answers indexing by ELK ")
 # if creating initilization (start with resetting exisiting data (delete_qs_and_as()) then 1- get_qs('tag',10) tag=api. 1000 posts. 2- Store the Qs 3- get As 4- Store As insert_As_into_Qs_MongoDB() 5- index questions at elk 6- index As using Elk. Now that Elasticsearch has everything, we can simply use our indexing.py
 
-#TODO make an advanced search against SO API looking for posts that conatins API keyword in titlte or in the body for a given tag posts
+#TODO make an advanced search against SO API looking for
+# posts that conatins API keyword in titlte or in the body for a given tag posts
