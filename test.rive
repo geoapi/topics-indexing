@@ -1,0 +1,44 @@
++ hello
+- hi
+
++ how are you
+- I'm great, how are you?
+- I'm good, you?
+- Good :) you?
+- Great! You?
+- I'm fine, thanks for asking!
+
++ good
+- cool
+
+> object get_topic python
+    topic = args[0].strip('"\'')
+    from elasticsearch import Elasticsearch
+    import json
+    es = Elasticsearch()
+    api = "facebook"
+    params = json.dumps({
+        "query": {
+            "bool": {
+              "must": [{
+                  "match": {
+                      "api": api
+                  }
+              }, {
+                  "match": {
+                      "topic": topic
+                  }
+              }]
+            }
+        }
+    })
+    data = es.search(index="question", doc_type="so", body=params, size=10)
+    if (data['hits']['total'] > 0):
+        data2 = data['hits']['hits']
+    else:
+        data2 =[]
+    return (data['hits']['total'], data2)
+< object
+
++ get topic *
+- <call>get_topic "<star>"</call>
