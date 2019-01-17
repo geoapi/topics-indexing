@@ -458,16 +458,25 @@ def elastic_request_topic(topic_name):
 def elastic_request_apiAndtopic(topic_name,api_name):
     from elasticsearch import Elasticsearch
     es = Elasticsearch()
+    if (len(topic_name) > 1):
+        topic = ' '.join(topic_name)
+    else:
+        topic = topic_name[0]
+    if (len(api_name) > 1):
+        api = ' '.join(api_name)
+    else:
+        api = api_name[0]
+
     params = json.dumps({
         "query": {
             "bool": {
               "must": [{
                   "match": {
-                      "api": api_name[0]
+                      "api": api
                   }
               }, {
                   "match": {
-                      "topic": topic_name[0]
+                      "topic": topic
                   }
               }]
             }
@@ -482,7 +491,8 @@ def elastic_request_apiAndtopic(topic_name,api_name):
 
 
 
-
+#A DSL that consider topic colon and keyword e.g. topic:security and api colon keyword e.g. api:facebook
+#returns array of topic names and array of api names
 def check_dsl_string(dsl_string):
     import spacy
     nlp = spacy.load('en')
@@ -498,6 +508,40 @@ def check_dsl_string(dsl_string):
             api_name.append(lemmas[j+2])
         j=j+3
     return(topic_name,api_name)
+
+
+# A DSL that is similar to Blekko
+def check_bdsl_string(dsl_string):
+    dsl_string = dsl_string.split(' ')
+    #prepare a bare-list of api names and another for topic names so we can match
+    topic_dict_temp = []
+    api_dict_temp = []
+    topic_name = []
+    api_name = []
+    for item in api_dict:
+        if item['name']:
+          api_dict_temp.append(item['name'].lower())
+        for key in item['keywords']:
+           if key:
+               api_dict_temp.append(key.lower())
+    topics_dict_temp = []
+    for item in topic_dict:
+        topics_dict_temp.append(item['name'].lower())
+        for key in item['keywords']:
+            if key:
+                topics_dict_temp.append(key.lower())
+    not_included_dict = []
+    for one_item in dsl_string:
+        user_keyword = ''.join(filter(str.isalnum,one_item))
+        operator = one_item[0]
+        if (user_keyword in topics_dict_temp and operator == '/'):
+            topic_name.append(user_keyword)
+        if (user_keyword in api_dict_temp and operator == '/'):
+            api_name.append(user_keyword)
+        if (operator == '-'):
+            not_included_dict.append(user_keyword)
+
+    return(topic_name,api_name,not_included_dict)
 
 # Here you can specify the number of pages where each page is 100 Questions
     #This is where the requests to store questions begins here only 300 questions
@@ -727,12 +771,23 @@ s = timer()
 #a= elastic_request_topic("debugging")
 #print(a)
 
+
+
 #get string that contains dsl query and identify topic names and api names and return dictionary for both
-a = check_dsl_string("topic:security api:facebook")
-print(a)
+#a = check_dsl_string("topic:security topic:debugging api:facebook")
+#print(a)
 #get search results for a topic and an API as returned by the query.
-k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
-print(k)
+#k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
+#print(k)
+
+
+#get string that contains dsl query similar to blekko and identify topic names and api names and return dictionary for both
+a = check_bdsl_string("/security /debugging /facebook -python")
+print(a)
+
+
+#k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
+#print(k)
 
 e = timer()
 print(e-s, " timing Questions and Answers indexing by ELK ")
