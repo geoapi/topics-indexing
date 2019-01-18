@@ -543,6 +543,53 @@ def check_bdsl_string(dsl_string):
 
     return(topic_name,api_name,not_included_dict)
 
+
+# Dynamic Construction of ELK DSL
+def construct_dynamic_dsl(topic_name,api_name,not_included_dict):
+    i = 0
+    op = ''
+    match_ = ''
+    while (len(topic_name) > 1 and i < len(topic_name)):
+       match_ = match_ +op+' {"match":{"topic":"'+topic_name[i]+'"}}'
+       op = ','
+       i +=1
+    i = 0
+    while (len(api_name) >= 1 and i < len(api_name)):
+        match_ = match_ + op + ' {"match":{"api":"' + api_name[i] + '"}}'
+        op = ','
+        i += 1
+    if (len(topic_name) >1 or len(api_name) > 1):
+        match_ = '{"bool": {"must": ['+match_+']}}'
+# MUST NOT
+    i = 0
+    op = ''
+    match2_ = ''
+    while (len(not_included_dict) >= 1 and i < len(not_included_dict)):
+        match2_ = match2_ + op + ' {"match":{"tags":"' + not_included_dict[i] + '"}}'
+        op = ','
+        i += 1
+    if not_included_dict:
+        match2_ = ',{"bool":{"must_not":['+match2_+']}'
+    dsl = '{"query":{"bool":{"must":['+match_+match2_+'}]}}}'
+    return dsl
+
+#only for topic AND api MUST
+def construct_dynamic_dsl_api_topic(topic_name,api_name,not_included_dict):
+    i = 0
+    op = ''
+    match_ =''
+    while (len(topic_name) > 1 and i < len(topic_name)):
+       match_ = match_ +op+' {"match":{"topic":"'+topic_name[i]+'"}}'
+       op = ','
+       i +=1
+    i = 0
+    op = ','
+    while (len(api_name) > 1 and i < len(api_name)):
+        match_ = match_ + op + ' {"match":{"api":"' + api_name[i] + '"}}'
+        op = ','
+        i += 1
+    dsl = '{"query":{"bool":{"must":['+match_+']} }}'
+    return dsl
 # Here you can specify the number of pages where each page is 100 Questions
     #This is where the requests to store questions begins here only 300 questions
     #get_qs('api',3) #first
@@ -780,11 +827,15 @@ s = timer()
 #k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
 #print(k)
 
-
+import json
 #get string that contains dsl query similar to blekko and identify topic names and api names and return dictionary for both
-a = check_bdsl_string("/security /debugging /facebook -python")
-print(a)
+#It works!!!! Al Hamdo Lil Allah
+#a = check_bdsl_string("/security /debugging /facebook -python")
 
+a = check_bdsl_string("/security /facebook -python -cython")
+print(a)
+a= construct_dynamic_dsl(a[0],a[1],a[2])
+print(a)
 
 #k = elastic_request_apiAndtopic(a[0],a[1]) #TODO Extend it to include NOT and to include more than just one API and one topic
 #print(k)
